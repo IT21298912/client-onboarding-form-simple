@@ -1,103 +1,205 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { OnboardSchema, OnboardInput, SERVICES } from "@/app/lib/schema";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+
+function todayLocalISO() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); // avoid timezone shift
+  return d.toISOString().slice(0, 10);
+}
+
+export default function OnboardingPage() {
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [serverSuccess, setServerSuccess] = useState<OnboardInput | null>(null);
+
+  const searchParams = useSearchParams();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+    setValue,
+    getValues,
+  } = useForm<OnboardInput>({
+    resolver: zodResolver(OnboardSchema) as any,
+    defaultValues: {
+      fullName: "",
+      email: "",
+      companyName: "",
+      services: [],
+      budgetUsd: undefined,
+      projectStartDate: todayLocalISO(), // default today
+      acceptTerms: false as any,
+    } as OnboardInput,
+  });
+
+  // Bonus: Prefill from query param ?service=UI%2FUX
+  useEffect(() => {
+    const s = searchParams.get("service");
+    if (s && SERVICES.includes(s as any)) {
+      const current = getValues("services");
+      if (!current.includes(s as any)) {
+        setValue("services", [...current, s as any], { shouldValidate: true });
+      }
+    }
+  }, [searchParams, getValues, setValue]);
+
+  const onSubmit = async (data: OnboardInput) => {
+    setServerError(null);
+    setServerSuccess(null);
+
+    try {
+      const res = await fetch("/api/onboard", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(data),
+});
+
+
+      if (!res.ok) {
+        throw new Error(`Request failed with status ${res.status}`);
+      }
+
+      setServerSuccess(data);
+      reset({
+        ...data,
+        projectStartDate: todayLocalISO(), // reset date to today
+        acceptTerms: false as any,
+      });
+    } catch (err: any) {
+      setServerError(err.message || "Something went wrong");
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="max-w-xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-4">Client Onboarding</h1>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      {serverError && (
+        <div className="bg-red-100 text-red-800 p-3 mb-4 rounded">
+          {serverError}
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      )}
+
+      {serverSuccess && (
+        <div className="bg-green-100 text-green-800 p-3 mb-4 rounded">
+          Form submitted successfully!
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        {/* Full Name */}
+        <div>
+          <label className="block font-medium">Full Name</label>
+          <input
+            {...register("fullName")}
+            className="border rounded w-full p-2"
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+          {errors.fullName && (
+            <p className="text-red-600 text-sm">{errors.fullName.message}</p>
+          )}
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className="block font-medium">Email</label>
+          <input
+            type="email"
+            {...register("email")}
+            className="border rounded w-full p-2"
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+          {errors.email && (
+            <p className="text-red-600 text-sm">{errors.email.message}</p>
+          )}
+        </div>
+
+        {/* Company Name */}
+        <div>
+          <label className="block font-medium">Company Name</label>
+          <input
+            {...register("companyName")}
+            className="border rounded w-full p-2"
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          {errors.companyName && (
+            <p className="text-red-600 text-sm">{errors.companyName.message}</p>
+          )}
+        </div>
+
+        {/* Services */}
+        <fieldset>
+          <legend className="font-medium">Services Interested In</legend>
+          <div className="space-y-1">
+            {SERVICES.map((service) => (
+              <label key={service} className="block">
+                <input
+                  type="checkbox"
+                  value={service}
+                  {...register("services")}
+                  className="mr-2"
+                />
+                {service}
+              </label>
+            ))}
+          </div>
+          {errors.services && (
+            <p className="text-red-600 text-sm">{errors.services.message}</p>
+          )}
+        </fieldset>
+
+        {/* Budget */}
+        <div>
+          <label className="block font-medium">Budget (USD) - optional</label>
+          <input
+            type="number"
+            {...register("budgetUsd")}
+            className="border rounded w-full p-2"
+          />
+          {errors.budgetUsd && (
+            <p className="text-red-600 text-sm">{errors.budgetUsd.message}</p>
+          )}
+        </div>
+
+        {/* Project Start Date */}
+        <div>
+          <label className="block font-medium">Project Start Date</label>
+          <input
+            type="date"
+            min={todayLocalISO()} // ✅ no past dates
+            {...register("projectStartDate")}
+            className="border rounded w-full p-2"
+          />
+          {errors.projectStartDate && (
+            <p className="text-red-600 text-sm">
+              {errors.projectStartDate.message}
+            </p>
+          )}
+        </div>
+
+        {/* Accept Terms */}
+        <div>
+          <label className="inline-flex items-center">
+            <input type="checkbox" {...register("acceptTerms")} className="mr-2" />
+            Accept Terms
+          </label>
+          {errors.acceptTerms && (
+            <p className="text-red-600 text-sm">{errors.acceptTerms.message}</p>
+          )}
+        </div>
+
+        {/* Submit */}
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
+        >
+          {isSubmitting ? "Submitting..." : "Submit"}
+        </button>
+      </form>
+    </main>
   );
 }
