@@ -7,7 +7,6 @@ A modern **client onboarding form** built with **Next.js**, **React**, **React H
 ## Demo
 
 <!-- You can replace these with actual screenshots or GIFs -->
-![Onboarding Form Screenshot](./demo/screenshot.png)
 
 Form validates input, handles submission, and ensures terms are accepted.
 
